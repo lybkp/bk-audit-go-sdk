@@ -1,27 +1,37 @@
 package bkaudit
 
-import (
-	log "github.com/sirupsen/logrus"
-)
-
-// BaseExporter - Interface for Exporter
-type BaseExporter interface {
-	Export(queue BaseQueue)
+// Exporter - Interface for Exporter
+type Exporter interface {
+	Export(queue Queue)
+	Validate() bool
 }
 
-// Exporter - Build in Exporter
-type Exporter struct{}
+// LoggerExporter - Build in Exporter
+type LoggerExporter struct {
+	Logger interface {
+		Info(arg ...interface{})
+	}
+}
 
 // Export - Export Audit Event to Log
-func (e *Exporter) Export(queue BaseQueue) {
+func (e *LoggerExporter) Export(queue Queue) {
 	for event := range queue {
 		// get string data
 		data, err := event.String()
 		if err != nil {
-			log.Error("export event failed: ", err)
+			logger.Error("export event failed: ", err)
 			return
 		}
-		// Directly Export to Log
-		log.Info(data)
+		// Directly Export to EventLog
+		e.Logger.Info(data)
 	}
+}
+
+// Validate - Validate Exporter
+func (e *LoggerExporter) Validate() bool {
+	if e.Logger == nil {
+		logger.Error("logger of exporter unset")
+		return false
+	}
+	return true
 }

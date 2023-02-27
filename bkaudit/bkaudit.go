@@ -5,22 +5,27 @@ package bkaudit
 import (
 	"errors"
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 )
 
 // EventClient - Client to Generate Event
 type EventClient struct {
 	BkAppCode   string
 	BkAppSecret string
-	formatter   BaseFormatter
-	exporters   []BaseExporter
-	queues      []BaseQueue
+	formatter   Formatter
+	exporters   []Exporter
+	queues      []Queue
 }
 
 func (client *EventClient) check() (err error) {
 	// Formatter and Exporter should be initialized before use
 	if client.formatter == nil || len(client.exporters) == 0 {
 		return errors.New("formatter or exporter not set")
+	}
+	// Check Exporter Valid
+	for _, e := range client.exporters {
+		if !e.Validate() {
+			return errors.New("exporter validate error")
+		}
 	}
 	return nil
 }
@@ -54,7 +59,7 @@ func (client *EventClient) AddEvent(
 		extendData,
 	)
 	if err != nil {
-		log.Error("format event failed: ", err)
+		logger.Error("format event failed: ", err)
 		return
 	}
 	// Add BkAppCode
@@ -69,19 +74,14 @@ func (client *EventClient) AddEvent(
 func InitEventClient(
 	bkAppCode string,
 	bkAppSecret string,
-	formatter BaseFormatter,
-	exporters []BaseExporter,
+	formatter Formatter,
+	exporters []Exporter,
 	queueLength int,
 	preInit func(),
 ) (client *EventClient, err error) {
 	// pre init
 	if preInit == nil {
-		func() {
-			// init uuid version 4
-			uuid.EnableRandPool()
-			// init log
-			initLog()
-		}()
+		uuid.EnableRandPool()
 	} else {
 		preInit()
 	}
@@ -92,9 +92,9 @@ func InitEventClient(
 		queueLength = AuditEventQueueLength
 	}
 	// Start Exporter
-	queues := make([]BaseQueue, len(exporters))
+	queues := make([]Queue, len(exporters))
 	for i := 0; i < len(exporters); i++ {
-		q := make(BaseQueue, queueLength)
+		q := make(Queue, queueLength)
 		queues[i] = q
 		go exporters[i].Export(q)
 	}
